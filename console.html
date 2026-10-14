@@ -1071,6 +1071,12 @@ PAGES.profil = async (m) => {
   m.innerHTML = head('Sécurité', 'Mon profil', `Compte : ${esc(S.user.email)}`) +
   `<div class="sec"><form id="mpf" class="f"><label>Nom et prénom<input class="inp" id="mp-n" name="n" value="${esc(p.nom || '')}" required></label><label>Fonction<input class="inp" id="mp-f" name="f" value="${esc(p.fonction || '')}"></label><label>Téléphone<input class="inp" id="mp-t" name="t" value="${esc(p.telephone || '')}"></label><button class="btn primary">Enregistrer</button></form></div>
   <div class="sec"><h2>Mes rôles</h2><ul>${(S.me?.roles || []).map(r => `<li>${ROLES[r.role]}${r.valid_until ? ' — jusqu’au ' + fmtD(r.valid_until) : ''}</li>`).join('')}</ul><p class="note">Pour changer de rôle, adressez-vous à la Direction. Vous ne pouvez pas vous attribuer de droits vous-même.</p></div>`;
+  m.insertAdjacentHTML('beforeend', `<div class="sec"><h2>Changer mon mot de passe</h2><form id="pwf" class="f"><label>Nouveau mot de passe (10 caractères minimum)<input class="inp" type="password" id="pw1" minlength="10" autocomplete="new-password" required></label><label>Confirmer<input class="inp" type="password" id="pw2" minlength="10" autocomplete="new-password" required></label><button class="btn primary">Enregistrer le nouveau mot de passe</button></form><p class="note">Le changement est immédiat, sans e-mail. Utilisez un mot de passe que vous n’employez nulle part ailleurs.</p></div>`);
+  $('#pwf').onsubmit = async (e) => { e.preventDefault(); const a = $('#pw1').value, b = $('#pw2').value;
+    if (a !== b) return toast('Les deux mots de passe ne sont pas identiques.', true);
+    const { error } = await sb.auth.updateUser({ password: a });
+    if (error) return toast(/same|different/i.test(error.message) ? 'Choisissez un mot de passe différent de l’actuel.' : /weak|short|least/i.test(error.message) ? 'Mot de passe trop faible : 10 caractères minimum, avec lettres et chiffres.' : clean(error.message), true);
+    e.target.reset(); toast('Mot de passe changé. Utilisez-le dès la prochaine connexion.'); };
   $('#mpf').onsubmit = async (e) => { e.preventDefault(); const d = formData(e.target); await rpc('geci_upsert_my_profile', { p_nom: d.n, p_fonction: nz(d.f), p_tel: nz(d.t) }, 'Profil enregistré'); S.me = await rpc('geci_me'); };
 };
 
