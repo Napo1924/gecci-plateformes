@@ -691,7 +691,7 @@ const NAV = () => [
   ['Organisation GEC-CI', [['o_dash', 'Tableau de bord par niveau', staff()], ['o_org', 'Pilotage, zones et équipes', staff()], ['o_missions', 'Missions et activités (équipes)', staff()], ['o_preuves', 'Preuves et import', staff()], ['o_personnel', 'Personnel (RH)', staff()], ['o_zones', 'Zones et sites', staff()], ['o_notifs', 'Notifications', staff()], ['o_stockage', 'Stockage', has('SUPER_ADMIN','DIRECTEUR','RESPONSABLE_INFORMATIQUE','GESTIONNAIRE_DOCUMENTAIRE')]]],
   ['Conformité GEC-CI', [['regl', 'Registre réglementaire', staff()], ['recette', 'Recette du système', has('DIRECTEUR','SUPER_ADMIN')]]],
   ['Plateformes GEC-CI', [['plateformes', 'Portail, plateformes et sites', true]]],
-  ['Sécurité', [['users', 'Utilisateurs et rôles', has('DIRECTEUR','SUPER_ADMIN')], ['journal', 'Journal d’audit', has('DIRECTEUR','SUPER_ADMIN')], ['backup', 'Sauvegardes', has('DIRECTEUR','SUPER_ADMIN')], ['profil', 'Mon profil', true]]],
+  ['Sécurité', [['comptes', 'Comptes collaborateurs', has('DIRECTEUR','SUPER_ADMIN')], ['users', 'Utilisateurs et rôles', has('DIRECTEUR','SUPER_ADMIN')], ['journal', 'Journal d’audit', has('DIRECTEUR','SUPER_ADMIN')], ['backup', 'Sauvegardes', has('DIRECTEUR','SUPER_ADMIN')], ['profil', 'Mon profil', true]]],
 ];
 function shell() {
   const roleTxt = [...S.roles].map(r => ROLES[r]).join(' · ') + (S.clientRoles.length ? (S.roles.size ? ' · ' : '') + S.clientRoles.map(r => ROLES[r.role]).join(' · ') : '');
@@ -1008,7 +1008,7 @@ PAGES.users = async (m) => {
   `<div class="sec"><h2>Rôles attribués</h2><div class="tw"><table><thead><tr><th>Personne</th><th>Rôle</th><th>Client</th><th>Jusqu’au</th><th>Attribué</th><th>État</th><th></th></tr></thead><tbody>${rs.map(r => { const act = !r.revoked_at && (!r.valid_until || new Date(r.valid_until) > new Date());
     return `<tr><td>${esc(name(r.user_id))}</td><td>${ROLES[r.role_code]}</td><td>${esc(r.geci_clients?.raison_sociale || '—')}</td><td>${fmtD(r.valid_until)}</td><td>${fmtD(r.granted_at)}<div class="small muted">${esc(r.motif || '')}</div></td><td>${act ? chip('actif', 'ok') : chip(r.revoked_at ? 'révoqué' : 'expiré', 'bad')}</td><td>${act && (SA || r.role_code !== 'SUPER_ADMIN') ? `<button class="btn sm danger" data-rv="${r.id}">Révoquer</button>` : ''}</td></tr>`; }).join('')}</tbody></table></div>
    <div id="rvbox"></div>
-   <details class="add"><summary>Attribuer un rôle</summary><form id="grf" class="f"><label>E-mail du compte (déjà créé)<input class="inp" type="email" id="gr-e" name="e" required></label><label>Rôle<select class="inp" id="gr-r" name="r">${Object.entries(ROLES).filter(([k]) => SA || k !== 'SUPER_ADMIN').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label><label>Client (rôles CLIENT et PRESTATAIRE)<select class="inp" id="gr-c" name="c"><option value="">—</option>${cs.map(c => `<option value="${c.id}">${esc(c.raison_sociale)}</option>`).join('')}</select></label><label>Valide jusqu’au (obligatoire pour un prestataire)<input class="inp" type="date" id="gr-u" name="u"></label><label class="wide">Motif<input class="inp" id="gr-m" name="m" required placeholder="Recrutement consultant, contrat de sous-traitance n°…"></label><button class="btn primary">Attribuer</button></form></details></div>
+   <details class="add"><summary>Attribuer un rôle</summary><form id="grf" class="f"><label>E-mail du compte (déjà créé — sinon : Sécurité → Comptes collaborateurs)<input class="inp" type="email" id="gr-e" name="e" required></label><label>Rôle<select class="inp" id="gr-r" name="r">${Object.entries(ROLES).filter(([k]) => SA || k !== 'SUPER_ADMIN').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label><label>Client (rôles CLIENT et PRESTATAIRE)<select class="inp" id="gr-c" name="c"><option value="">—</option>${cs.map(c => `<option value="${c.id}">${esc(c.raison_sociale)}</option>`).join('')}</select></label><label>Valide jusqu’au (obligatoire pour un prestataire)<input class="inp" type="date" id="gr-u" name="u"></label><label class="wide">Motif<input class="inp" id="gr-m" name="m" required placeholder="Recrutement consultant, contrat de sous-traitance n°…"></label><button class="btn primary">Attribuer</button></form></details></div>
   <div class="sec"><h2>Comptes</h2><div class="tw"><table><thead><tr><th>Nom</th><th>Fonction</th><th>Type</th><th>État</th><th></th></tr></thead><tbody>${ps.map(p => `<tr><td>${esc(p.nom)}</td><td>${esc(p.fonction || '')}</td><td>${p.est_compte_ia ? chip('compte IA', 'info') : 'humain'}</td><td>${p.actif ? chip('actif', 'ok') : chip('désactivé', 'bad')}</td><td>${SA && p.user_id !== S.user.id ? `<button class="btn sm ${p.actif ? 'danger' : ''}" data-act="${p.user_id}" data-v="${p.actif ? 0 : 1}">${p.actif ? 'Désactiver' : 'Réactiver'}</button>` : ''}</td></tr>`).join('')}</tbody></table></div><p class="note small">Un nouveau collaborateur crée d’abord son compte (écran de connexion), puis vous lui attribuez un rôle ici.</p></div>`;
   $('#grf').onsubmit = async (e) => { e.preventDefault(); const d = formData(e.target);
     await rpc('geci_grant_role', { p_email: d.e, p_role: d.r, p_client: nz(d.c), p_valid_until: d.u ? new Date(d.u + 'T23:59:59').toISOString() : null, p_motif: d.m }, 'Rôle attribué'); await loadProfiles(); go('users'); };
@@ -1076,11 +1076,69 @@ PAGES.profil = async (m) => {
     if (a !== b) return toast('Les deux mots de passe ne sont pas identiques.', true);
     const { error } = await sb.auth.updateUser({ password: a });
     if (error) return toast(/same|different/i.test(error.message) ? 'Choisissez un mot de passe différent de l’actuel.' : /weak|short|least/i.test(error.message) ? 'Mot de passe trop faible : 10 caractères minimum, avec lettres et chiffres.' : clean(error.message), true);
-    e.target.reset(); toast('Mot de passe changé. Utilisez-le dès la prochaine connexion.'); };
+    await sb.rpc('geci_temp_password_done'); e.target.reset(); toast('Mot de passe changé. Utilisez-le dès la prochaine connexion.'); };
   $('#mpf').onsubmit = async (e) => { e.preventDefault(); const d = formData(e.target); await rpc('geci_upsert_my_profile', { p_nom: d.n, p_fonction: nz(d.f), p_tel: nz(d.t) }, 'Profil enregistré'); S.me = await rpc('geci_me'); };
 };
 
 /* ---------------- Démarrage ---------------- */
+function tempPasswordView() {
+  authShell(`<h1 style="font-size:19px">Choisissez votre mot de passe</h1>
+  <p class="note">Bienvenue ${esc(S.me.profil?.nom || '')}. Votre compte a été créé par la Direction de GEC-CI avec un mot de passe provisoire. Choisissez maintenant votre mot de passe personnel : personne d’autre ne le connaîtra.</p>
+  <form id="tpf" class="f" style="grid-template-columns:1fr"><label>Nouveau mot de passe (10 caractères minimum, lettres et chiffres)<input class="inp" type="password" id="tp1" minlength="10" autocomplete="new-password" required></label>
+  <label>Confirmer<input class="inp" type="password" id="tp2" minlength="10" autocomplete="new-password" required></label><div id="tpm" class="small" style="color:#B42318"></div>
+  <button class="btn primary">Enregistrer et continuer</button></form><button class="btn sm" id="out" style="margin-top:8px">Se déconnecter</button>`);
+  $('#out').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+  $('#tpf').onsubmit = async (e) => { e.preventDefault(); const a = $('#tp1').value, b = $('#tp2').value, msg = (t) => $('#tpm').textContent = t;
+    if (a !== b) return msg('Les deux mots de passe ne sont pas identiques.');
+    if (!/[A-Za-z]/.test(a) || !/[0-9]/.test(a)) return msg('Utilisez des lettres et des chiffres.');
+    const { error } = await sb.auth.updateUser({ password: a });
+    if (error) return msg(/same|different/i.test(error.message) ? 'Choisissez un mot de passe différent du mot de passe provisoire.' : clean(error.message));
+    const { data: ok } = await sb.rpc('geci_temp_password_done');
+    if (ok === false) return msg('Choisissez un mot de passe différent du mot de passe provisoire.');
+    toast('Mot de passe enregistré'); boot(); };
+}
+const TPW = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; let p = '';
+  do { const r = crypto.getRandomValues(new Uint32Array(12)); p = [...r].map(x => A[x % A.length]).join(''); } while (!/[A-Za-z]/.test(p) || !/[0-9]/.test(p)); return p; };
+PAGES.comptes = async (m) => {
+  const [ac, cs] = await Promise.all([rpc('geci_admin_accounts'), sel('geci_clients', 'id,raison_sociale', q => q.order('raison_sociale'))]);
+  const SA = has('SUPER_ADMIN');
+  m.innerHTML = head('Sécurité', 'Comptes collaborateurs', 'La Direction crée les comptes avec un mot de passe provisoire, sans e-mail. Le collaborateur choisit son propre mot de passe à sa première connexion.',
+    `<button class="btn primary" id="newacc">Créer un compte collaborateur</button>`) +
+  `<div id="accbox"></div>
+  <div class="sec"><h2>${ac.length} compte(s) actif(s)</h2><div class="tw"><table><thead><tr><th>Nom</th><th>E-mail</th><th>Rôles</th><th>Mot de passe</th><th>Dernière connexion</th><th></th></tr></thead><tbody>${ac.map(a => `<tr><td><b>${esc(a.nom || '—')}</b><div class="small muted">${esc(a.fonction || '')}</div></td><td class="mono">${esc(a.email)}</td><td>${(a.roles || []).map(r => chip(ROLES[r] || r, 'info')).join(' ') || chip('aucun rôle', 'warn')}</td>
+    <td>${a.mdp_provisoire ? chip('provisoire, à changer', 'warn') : chip('personnel', 'ok')}</td><td>${a.derniere_connexion ? fmtDT(a.derniere_connexion) : chip('jamais connecté', '')}</td>
+    <td>${a.user_id !== S.user.id && (SA || !(a.roles || []).some(r => ['SUPER_ADMIN','DIRECTEUR'].includes(r))) ? `<button class="btn sm" data-rst="${a.user_id}" data-em="${esc(a.email)}">Nouveau mot de passe provisoire</button>` : ''}</td></tr>`).join('')}</tbody></table></div>
+  <p class="note">Mot de passe oublié par un collaborateur : « Nouveau mot de passe provisoire ». Ses sessions ouvertes sont fermées et il devra choisir un nouveau mot de passe à la connexion. Les mots de passe ne sont jamais enregistrés en clair.</p></div>`;
+  const showPw = (em, pw, titre) => { $('#accbox').innerHTML = `<div class="sec" style="border-left:4px solid var(--gold)"><h2>${esc(titre)}</h2>
+    <dl class="kv"><dt>Adresse de connexion</dt><dd class="mono">${esc(location.origin + location.pathname)}</dd><dt>Identifiant</dt><dd class="mono">${esc(em)}</dd><dt>Mot de passe provisoire</dt><dd class="mono" style="font-size:18px"><b>${esc(pw)}</b></dd></dl>
+    <div class="row" style="margin-top:8px"><button class="btn" id="cpy">Copier le message à transmettre</button></div>
+    <p class="note">Transmettez ces informations en main propre ou par message privé, jamais dans un groupe. Ce mot de passe ne sera plus affiché après avoir quitté cette page. Le collaborateur devra le remplacer dès sa première connexion.</p></div>`;
+    const txt = `GEC-CI — votre accès aux plateformes\nAdresse : ${location.origin + location.pathname}\nIdentifiant : ${em}\nMot de passe provisoire : ${pw}\nÀ la première connexion, vous choisirez votre mot de passe personnel.`;
+    $('#cpy').onclick = async () => { try { await navigator.clipboard.writeText(txt); toast('Message copié'); } catch (e) { toast('Copie impossible : sélectionnez le texte à la main.', true); } };
+    $('#accbox').scrollIntoView({ behavior: 'smooth' }); };
+  $('#newacc').onclick = () => { const pw = TPW();
+    $('#accbox').innerHTML = `<div class="sec"><h2>Créer un compte collaborateur</h2><form id="caf" class="f">
+      <label>Nom et prénom<input class="inp" id="ca-n" name="n" required></label><label>Fonction<input class="inp" id="ca-f" name="f" placeholder="Agent de terrain, Consultant RA…"></label>
+      <label>E-mail (identifiant de connexion)<input class="inp" type="email" id="ca-e" name="e" required></label>
+      <label>Rôle<select class="inp" id="ca-r" name="r">${Object.entries(ROLES).filter(([k]) => (SA || k !== 'SUPER_ADMIN')).map(([k, v]) => `<option value="${k}" ${k === 'AGENT_TERRAIN' ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label>Client (rôles Client et Prestataire)<select class="inp" id="ca-c" name="c"><option value="">—</option>${cs.map(c => `<option value="${c.id}">${esc(c.raison_sociale)}</option>`).join('')}</select></label>
+      <label>Accès jusqu’au (obligatoire pour un prestataire)<input class="inp" type="date" id="ca-u" name="u"></label>
+      <label class="wide">Motif de création<input class="inp" id="ca-m" name="m" required placeholder="Recrutement, affectation au projet RA, mission…"></label>
+      <label>Mot de passe provisoire<input class="inp mono" id="ca-p" name="p" value="${pw}" minlength="10" required></label>
+      <div class="row"><button class="btn" type="button" id="ca-g">Générer un autre</button><button class="btn primary">Créer le compte</button></div></form>
+      <p class="note">Le compte est actif immédiatement, sans e-mail de confirmation. Pour un collaborateur interne, créez ensuite sa fiche dans Organisation GEC-CI → Personnel (RH) en y saisissant cet e-mail : la fiche sera reliée au compte.</p></div>`;
+    $('#ca-g').onclick = () => $('#ca-p').value = TPW();
+    $('#caf').onsubmit = async (e) => { e.preventDefault(); const d = formData(e.target);
+      await rpc('geci_admin_create_account', { p_email: d.e, p_nom: d.n, p_fonction: nz(d.f), p_role: d.r, p_mot_de_passe: d.p, p_motif: d.m, p_client: nz(d.c), p_valid_until: d.u ? new Date(d.u + 'T23:59:59').toISOString() : null }, 'Compte créé');
+      await loadProfiles(); await PAGES.comptes(m); showPw(d.e.toLowerCase(), d.p, 'Compte créé : informations à transmettre'); };
+    $('#accbox').scrollIntoView({ behavior: 'smooth' }); };
+  m.querySelectorAll('[data-rst]').forEach(b => b.onclick = () => { const pw = TPW();
+    $('#accbox').innerHTML = `<div class="sec"><h2>Nouveau mot de passe provisoire — ${esc(b.dataset.em)}</h2><form id="rsf" class="f"><label>Mot de passe provisoire<input class="inp mono" id="rs-p" value="${pw}" minlength="10" required></label><label class="wide">Motif<input class="inp" id="rs-m" required placeholder="Mot de passe oublié signalé le…"></label><button class="btn primary">Réinitialiser</button></form></div>`;
+    $('#rsf').onsubmit = async (e) => { e.preventDefault(); const p = $('#rs-p').value;
+      await rpc('geci_admin_reset_password', { p_user: b.dataset.rst, p_mot_de_passe: p, p_motif: $('#rs-m').value }, 'Mot de passe réinitialisé');
+      await PAGES.comptes(m); showPw(b.dataset.em, p, 'Nouveau mot de passe provisoire : informations à transmettre'); };
+    $('#accbox').scrollIntoView({ behavior: 'smooth' }); });
+};
 async function boot() {
   const { data } = await sb.auth.getUser(); S.user = data.user;
   if (!S.user) return loginView();
@@ -1089,6 +1147,7 @@ async function boot() {
   S.clientRoles = S.me.roles.filter(r => r.client_id).map(r => ({ role: r.role, client: r.client_id }));
   if (!S.roles.size && !S.clientRoles.length) return noRoleView();
   if (!S.me.profil?.actif && S.me.profil) return authShell('<h1 style="font-size:19px">Compte désactivé</h1><p class="note">Contactez le SUPER_ADMIN de GEC-CI.</p>');
+  if (S.me.profil?.mdp_provisoire) return tempPasswordView();
   await loadProfiles();
   let p = 'dash'; try { p = localStorage.getItem('geci-page') || 'dash'; } catch (e) { }
   if (['mission','client'].includes(p) || !PAGES[p]) p = 'dash';
