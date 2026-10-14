@@ -651,20 +651,12 @@ function loginView() {
   <label>Mot de passe<input class="inp" type="password" id="l-pass" name="password" minlength="8" autocomplete="current-password" required></label>
   <div id="lmsg" class="small muted"></div>
   <button class="btn primary" type="submit">Se connecter</button>
-  <button class="btn" type="button" id="l-up">Créer un compte</button>
-  <button class="btn sm" type="button" id="l-reset">Mot de passe oublié</button></form>`);
+  </form>
+  <p class="note small" style="margin-top:12px"><b>Pas encore de compte, ou mot de passe oublié ?</b> Les comptes sont créés par la Direction de GEC-CI, qui vous remet un mot de passe provisoire. Contactez-la : +225 05 55 49 45 94 · +225 07 57 88 13 49.</p>`);
   const v = () => ({ email: $('#l-email').value.trim(), password: $('#l-pass').value });
   const m = (t) => $('#lmsg').textContent = t;
   $('#lf').onsubmit = async (e) => { e.preventDefault(); m('Connexion…'); const { error } = await sb.auth.signInWithPassword(v());
     if (error) m(/confirm/i.test(error.message) ? 'Adresse non confirmée : ouvrez le lien reçu par e-mail.' : /fetch|network|load failed/i.test(error.message) ? 'Serveur IA GECI injoignable depuis cette page : ouvrez la console depuis le site des plateformes GEC-CI ou vérifiez Internet.' : 'E-mail ou mot de passe incorrect.'); else boot(); };
-  $('#l-up').onclick = async () => { const x = v(); if (!x.email || x.password.length < 8) return m('Saisissez un e-mail et un mot de passe de 8 caractères minimum.');
-    const o = /^https?:/.test(location.protocol) ? { emailRedirectTo: location.href.split('#')[0] } : {};
-    const { data, error } = await sb.auth.signUp({ ...x, options: o });
-    if (error) return m(/registered/i.test(error.message) ? 'Ce compte existe déjà : connectez-vous.' : 'Création impossible : ' + error.message);
-    if (data.session) boot(); else m('Compte créé. Confirmez votre adresse via le lien reçu par e-mail, puis connectez-vous. Un rôle doit ensuite vous être attribué par la Direction.'); };
-  $('#l-reset').onclick = async () => { const x = v(); if (!x.email) return m('Saisissez d’abord votre e-mail.');
-    const o = /^https?:/.test(location.protocol) ? { redirectTo: location.href.split('#')[0] } : {};
-    await sb.auth.resetPasswordForEmail(x.email, o); m('Si ce compte existe, un e-mail de réinitialisation a été envoyé.'); };
 }
 function noRoleView() {
   const p = S.me?.profil;

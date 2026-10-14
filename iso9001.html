@@ -2066,7 +2066,7 @@ window.GECI_BRIDGE = (() => {
     el.innerHTML = box(`<div style="${css};border-top:4px solid #C9A227"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8A6B0E;font-weight:600">IA GECI — Enterprise OS</div>
       <h2 style="margin:4px 0 6px;font-size:18px">Connectez-vous avec votre compte GEC-CI</h2><p style="margin:0 0 10px;color:#5A6B83">Le même compte que la console IA GECI et les plateformes GEC-CI Pro.</p>
       <form id="gb-f" style="display:grid;gap:8px;max-width:360px"><input id="gb-e" type="email" required placeholder="Adresse e-mail" style="padding:8px;border:1px solid #DCE3EC;border-radius:6px"><input id="gb-p" type="password" required minlength="8" placeholder="Mot de passe" style="padding:8px;border:1px solid #DCE3EC;border-radius:6px"><button style="background:#0A1628;color:#fff;border:0;padding:9px;border-radius:6px;font-weight:600;cursor:pointer">Se connecter</button><span id="gb-m" style="color:#B42318;font-size:13px"></span></form>
-      <p style="margin:10px 0 0"><a href="${CONSOLE}" target="_blank" rel="noopener" style="color:#1D5FA8">Pas encore de compte ? Créez-le dans la console IA GECI ↗</a></p></div>`);
+      <p style="margin:10px 0 0"><a href="${CONSOLE}" target="_blank" rel="noopener" style="color:#1D5FA8">Pas encore de compte ? Demandez-le à la Direction de GEC-CI (console IA GECI ↗)</a></p></div>`);
     el.querySelector('#gb-f').onsubmit = async (ev) => { ev.preventDefault(); const r = await own.auth.signInWithPassword({ email: el.querySelector('#gb-e').value.trim(), password: el.querySelector('#gb-p').value });
       if (r.error) el.querySelector('#gb-m').textContent = 'E-mail ou mot de passe incorrect.'; else render(el, own, referentiels, label); };
   }
