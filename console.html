@@ -678,10 +678,10 @@ function noRoleView() {
 
 /* ---------------- Coque applicative ---------------- */
 const NAV = () => [
-  ['Pilotage', [['dash', 'Tableau de bord', true]]],
+  ['Pilotage', [['dash', 'Tableau de bord', true], ['kpi', 'Indicateurs du système', has('DIRECTEUR','SUPER_ADMIN')]]],
   ['Activité', [['clients', 'Clients', true], ['missions', 'Missions', true], ['docs', 'Documents (GED)', true], ['incidents', 'Incidents et réclamations', true]]],
   ['Organisation GEC-CI', [['o_dash', 'Tableau de bord par niveau', staff()], ['o_org', 'Pilotage, zones et équipes', staff()], ['o_missions', 'Missions et activités (équipes)', staff()], ['o_preuves', 'Preuves et import', staff()], ['o_personnel', 'Personnel (RH)', staff()], ['o_zones', 'Zones et sites', staff()], ['o_notifs', 'Notifications', staff()], ['o_stockage', 'Stockage', has('SUPER_ADMIN','DIRECTEUR','RESPONSABLE_INFORMATIQUE','GESTIONNAIRE_DOCUMENTAIRE')]]],
-  ['Conformité GEC-CI', [['regl', 'Registre réglementaire', staff()], ['recette', 'Recette du système', has('DIRECTEUR','SUPER_ADMIN')]]],
+  ['Conformité GEC-CI', [['regl', 'Registre réglementaire', staff()], ['recette', 'Recette du système', has('DIRECTEUR','SUPER_ADMIN')], ['ia', 'Assistant IA (recherche)', staff()]]],
   ['Plateformes GEC-CI', [['plateformes', 'Portail, plateformes et sites', true]]],
   ['Sécurité', [['comptes', 'Comptes collaborateurs', has('DIRECTEUR','SUPER_ADMIN')], ['users', 'Utilisateurs et rôles', has('DIRECTEUR','SUPER_ADMIN')], ['journal', 'Journal d’audit', has('DIRECTEUR','SUPER_ADMIN')], ['backup', 'Sauvegardes', has('DIRECTEUR','SUPER_ADMIN')], ['profil', 'Mon profil', true]]],
 ];
@@ -1038,6 +1038,52 @@ PAGES.recette = async (m) => {
 };
 
 
+/* ---------------- LOT 17 : indicateurs (GECI-FTE-210) et assistant IA (GECI-PRO-220) ---------------- */
+const ETAT = { VERT: ['Vert', 'ok'], ORANGE: ['Orange', 'warn'], ROUGE: ['Rouge', 'bad'], INFO: ['Info', 'info'], SANS_DONNEE: ['Sans donnée', ''] };
+PAGES.kpi = async (m) => {
+  const d = await rpc('geci_kpi'); const ks = d.indicateurs || [];
+  const n = (e) => ks.filter(k => k.etat === e).length;
+  m.innerHTML = head('Pilotage', 'Indicateurs du système', `Fiches GECI-FTE-210. Valeurs calculées par le serveur le ${fmtDT(d.calcule_le)}, sans aucune donnée personnelle. Un indicateur rouge appelle une action et un responsable, pas une explication.`, '<button class="btn" id="kr">Recalculer</button>') +
+  `<div class="tiles"><div class="tile"><div class="n">${n('VERT')}</div><div class="l">Au vert</div></div><div class="tile ${n('ORANGE') ? 'alert' : ''}"><div class="n">${n('ORANGE')}</div><div class="l">À surveiller</div></div><div class="tile ${n('ROUGE') ? 'alert' : ''}"><div class="n">${n('ROUGE')}</div><div class="l">À traiter</div></div><div class="tile"><div class="n">${n('INFO') + n('SANS_DONNEE')}</div><div class="l">Information</div></div></div>
+  <div class="sec"><h2>${ks.length} indicateur(s)</h2><div class="tw"><table><thead><tr><th>Code</th><th>Indicateur</th><th>Valeur</th><th>Cible</th><th>Date de référence</th><th>État</th></tr></thead><tbody>${ks.map(k => `<tr><td class="mono">${esc(k.code)}</td><td>${esc(k.libelle)}</td><td class="num"><b>${esc(k.valeur ?? '—')}</b></td><td class="small">${esc(k.cible)}</td><td>${fmtDT(k.date)}</td><td>${chip((ETAT[k.etat] || [k.etat])[0], (ETAT[k.etat] || ['', ''])[1])}</td></tr>`).join('')}</tbody></table></div>
+  <p class="note">Les cibles marquées « À CONFIRMER » doivent être validées par la Direction avant d’être opposables. Sauvegardes : <a href="#" data-go="backup">registre des sauvegardes</a> · Recette : <a href="#" data-go="recette">résultats détaillés</a>.</p></div>`;
+  $('#kr').onclick = () => go('kpi');
+  m.querySelectorAll('[data-go]').forEach(a => a.onclick = (e) => { e.preventDefault(); go(a.dataset.go); });
+};
+
+const IA_FIN = { RECHERCHE_DOCUMENTAIRE: 'Recherche documentaire', PREPARATION: 'Préparation', CONTROLE: 'Contrôle', REDACTION: 'Rédaction', AUTRE: 'Autre' };
+const IA_ST = { PROPOSEE: ['À décider', 'warn'], VALIDEE: ['Validée', 'ok'], CORRIGEE: ['Corrigée', 'info'], REJETEE: ['Rejetée', 'bad'] };
+PAGES.ia = async (m, q0) => {
+  const lg = await sel('geci_ia_requests', 'id,numero,demandeur,finalite,question,sources,mode,statut,decide_par,decide_le,motif_decision,created_at', q => q.order('created_at', { ascending: false }).limit(50));
+  const dir = has('SUPER_ADMIN','DIRECTEUR','RESPONSABLE_CERTIFICATION');
+  m.innerHTML = head('Conformité GEC-CI', 'Assistant IA — recherche documentaire', 'Procédure GECI-PRO-220. L’assistant ne cherche que dans les documents APPROUVÉS auxquels vous avez droit. L’IA propose, un humain décide : chaque usage est journalisé et doit recevoir une décision.') +
+  `<div class="sec"><h2>Rechercher dans les documents approuvés</h2>
+   <form id="iaf" class="row"><input class="inp" id="ia-q" name="q" required minlength="3" maxlength="300" placeholder="Ex. : traçabilité cacao, audit interne, sauvegarde" style="flex:1" value="${esc(q0 || '')}"><button class="btn primary">Rechercher</button></form>
+   <p class="note small">N’écrivez ni nom de personne, ni téléphone, ni e-mail, ni numéro de pièce : la question est refusée par le serveur (données personnelles).</p>
+   <div id="iar"></div></div>
+  <div class="sec"><h2>${dir ? 'Journal des usages de l’IA (50 derniers)' : 'Mes usages de l’IA (50 derniers)'}</h2>${lg.length ? `<div class="tw"><table><thead><tr><th>N°</th><th>Date</th>${dir ? '<th>Demandeur</th>' : ''}<th>Finalité</th><th>Question</th><th>Sources</th><th>Décision</th><th></th></tr></thead><tbody>${lg.map(r => `<tr><td class="mono" style="white-space:nowrap">${esc(r.numero)}</td><td style="white-space:nowrap">${fmtDT(r.created_at)}</td>${dir ? `<td>${esc(name(r.demandeur))}</td>` : ''}<td>${esc(IA_FIN[r.finalite] || r.finalite)}<div class="small muted">${r.mode === 'RECHERCHE' ? 'Recherche' : 'Générative'}</div></td><td>${esc(r.question)}</td><td class="small mono">${(r.sources || []).map(x => esc(typeof x === 'string' ? x : (x.code || '') + ' ' + (x.version || ''))).join('<br>')}</td><td>${chip((IA_ST[r.statut] || [r.statut])[0], (IA_ST[r.statut] || ['', ''])[1])}${r.decide_le ? `<div class="small muted">${fmtDT(r.decide_le)} · ${esc(name(r.decide_par))}</div>` : ''}${r.motif_decision ? `<div class="small">${esc(r.motif_decision)}</div>` : ''}</td><td>${r.statut === 'PROPOSEE' && (r.demandeur === S.user.id || dir) ? `<button class="btn sm" data-dec="${r.id}">Décider</button>` : ''}</td></tr>`).join('')}</tbody></table></div><div id="decbox"></div>` : '<p class="note">Aucun usage journalisé.</p>'}</div>`;
+  $('#iaf').onsubmit = async (e) => {
+    e.preventDefault(); const q = $('#ia-q').value.trim();
+    let rs; try { rs = await rpc('geci_ia_search', { p_query: q, p_limit: 20 }); } catch (err) { $('#iar').innerHTML = `<p class="note">${esc(clean(err.message))}</p>`; return; }
+    $('#iar').innerHTML = rs.length ? `<div class="tw"><table><thead><tr><th></th><th>Code</th><th>Titre</th><th>Catégorie</th><th>Version</th><th>Pertinence</th></tr></thead><tbody>${rs.map(r => `<tr><td><input type="checkbox" data-src="${esc(r.code)}" checked></td><td class="mono">${esc(r.code)}</td><td>${esc(r.titre)}</td><td>${esc(r.categorie)}</td><td>${esc(r.version)}</td><td class="num">${r.pertinence}</td></tr>`).join('')}</tbody></table></div>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="ia-log">Journaliser cette recherche et les sources retenues</button><button class="btn" data-go="docs">Ouvrir la GED</button></div>`
+      : '<p class="note">Aucun document approuvé ne correspond. Reformulez avec les mots du document (titre, code, norme).</p>';
+    const gb = $('#iar [data-go]'); if (gb) gb.onclick = () => go('docs');
+    const lb = $('#ia-log'); if (lb) lb.onclick = async () => {
+      const src = [...$('#iar').querySelectorAll('[data-src]:checked')].map(x => x.dataset.src);
+      try { await rpc('geci_ia_log', { p_finalite: 'RECHERCHE_DOCUMENTAIRE', p_question: q, p_project: null, p_sources: src, p_suggestion: null, p_mode: 'RECHERCHE' }, 'Usage journalisé — décision humaine à enregistrer'); } catch (err) { return; }
+      go('ia');
+    };
+  };
+  if (q0) $('#iaf').requestSubmit();
+  m.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => {
+    $('#decbox').innerHTML = `<form id="decf" class="f" style="margin-top:12px"><label>Décision<select class="inp" id="dc-d" name="d"><option value="VALIDEE">Validée (sources utiles et suffisantes)</option><option value="CORRIGEE">Corrigée (à compléter par un humain)</option><option value="REJETEE">Rejetée (non pertinente)</option></select></label><label class="wide">Motif (obligatoire si corrigée ou rejetée)<input class="inp" id="dc-m" name="m"></label><button class="btn primary">Enregistrer la décision</button></form>`;
+    $('#decf').onsubmit = async (e) => { e.preventDefault(); const d = formData(e.target);
+      try { await rpc('geci_ia_decide', { p_id: b.dataset.dec, p_decision: d.d, p_motif: nz(d.m) }, 'Décision enregistrée'); } catch (err) { return; } go('ia'); };
+    $('#decbox').scrollIntoView({ behavior: 'smooth' });
+  });
+};
+
 const A_ = 'https://claude.ai/artifact/';
 const PLATS = [
   ['RAINFOREST_ALLIANCE', 'Rainforest Alliance', 'Cacao · standard v1.4', 'rainforest-alliance.html', 'M4iSwcmuj8GtaEcQnB3Tdr'],
@@ -1142,7 +1188,8 @@ async function boot() {
   if (S.me.profil?.mdp_provisoire) return tempPasswordView();
   await loadProfiles();
   let p = 'dash'; try { p = localStorage.getItem('geci-page') || 'dash'; } catch (e) { }
-  if (['mission','client'].includes(p) || !PAGES[p]) p = 'dash';
+  const allowed = NAV().flatMap(([, items]) => items.filter(i => i[2]).map(i => i[0]));
+  if (['mission','client'].includes(p) || !PAGES[p] || !allowed.includes(p)) p = 'dash';
   S.page = p; shell(); go(p);
 }
 if (!window.supabase?.createClient) { authShell('<b>Connexion Internet requise</b><p class="note">La bibliothèque de connexion n’a pas pu être chargée. Vérifiez la connexion puis rechargez la page.</p>'); return; }
